@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>いやさかQUEST — コーちゃん完全自由版</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: #000;
+      color: #8898b8;
+      font-family: "Courier New", Courier, monospace;
+    }
+    h1 {
+      font-size: 12px;
+      font-weight: normal;
+      letter-spacing: 0.12em;
+      color: #506080;
+    }
+    #frame {
+      position: relative;
+      width: 768px;
+      height: 576px;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      box-shadow: 0 0 0 4px #2040a0, 0 0 0 8px #000, 0 12px 40px rgba(0,0,0,0.6);
+      outline: none;
+    }
+    #game {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      cursor: default;
+      outline: none;
+    }
+    #msg {
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      bottom: 16px;
+      min-height: 88px;
+      padding: 12px 16px 28px;
+      background: #102848;
+      border: 3px solid #fff;
+      color: #fff;
+      font-size: 17px;
+      line-height: 1.5;
+      display: none;
+    }
+    #msg.open { display: flex; gap: 12px; align-items: flex-start; }
+    #msg-body { flex: 1; min-width: 0; }
+    #msg-video {
+      display: none;
+      width: 128px;
+      height: 72px;
+      object-fit: cover;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      border: 2px solid #fff;
+      flex-shrink: 0;
+    }
+    #msg.has-video #msg-video { display: block; }
+    #msg-name {
+      color: #f8d830;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    #msg-cursor {
+      position: absolute;
+      right: 12px;
+      bottom: 6px;
+      animation: blink 0.7s step-end infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+    #hint { font-size: 11px; color: #405060; max-width: 768px; text-align: center; line-height: 1.5; }
+    #kb {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      padding: 0;
+      border: none;
+      outline: none;
+      background: transparent;
+      z-index: 2;
+      caret-color: transparent;
+    }
+  </style>
+</head>
+<body>
+  <h1>いやさかQUEST — Phase 2（3人パーティ）</h1>
+  <div id="frame">
+    <input id="kb" type="text" readonly autofocus autocomplete="off" spellcheck="false" inputmode="none" aria-hidden="true" tabindex="0">
+    <canvas id="game"></canvas>
+    <div id="msg">
+      <div id="msg-body">
+        <div id="msg-name"></div>
+        <div id="msg-text"></div>
+      </div>
+      <img id="msg-video" src="assets/items/iyasaka-video.jpg" alt="">
+      <span id="msg-cursor">▼</span>
+    </div>
+  </div>
+  <p id="hint">読み込み中…</p>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
