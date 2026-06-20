@@ -69,8 +69,9 @@ function setHint(text) {
 
 function setUiMode() {
   document.body.classList.toggle('is-playing', state === 'play');
+  document.body.classList.toggle('is-menu', isMenuState());
   if (touchControls) {
-    touchControls.style.display = isTouchDevice ? 'grid' : '';
+    touchControls.style.display = isTouchDevice && !isMenuState() ? 'grid' : '';
   }
   layoutGame();
 }
@@ -539,6 +540,7 @@ function bindKeys() {
 
 canvas.addEventListener('click', (e) => {
   focusGame();
+  if (isMenuState()) return;
   if (state === 'play') {
     const clicked = npcAtClick(e.clientX, e.clientY);
     if (clicked) {
@@ -547,10 +549,28 @@ canvas.addEventListener('click', (e) => {
     }
     if (tryInteractable()) return;
     interact();
-    return;
   }
-  if (isMenuState()) interact();
 });
+
+function bindTapAdvance() {
+  const overlay = document.getElementById('tap-advance');
+  if (!overlay) return;
+  let lastTapAt = 0;
+
+  function onAdvance(e) {
+    if (!isMenuState()) return;
+    const now = performance.now();
+    if (now - lastTapAt < 180) return;
+    lastTapAt = now;
+    e.preventDefault();
+    e.stopPropagation();
+    focusGame();
+    interact();
+  }
+
+  overlay.addEventListener('touchend', onAdvance, { passive: false });
+  overlay.addEventListener('click', onAdvance);
+}
 
 gameFrame.addEventListener('pointerdown', () => focusGame());
 window.addEventListener('focus', () => focusGame());
@@ -639,6 +659,7 @@ function bindLayoutRefresh() {
 
 bindTouchControls();
 bindSwipeMove();
+bindTapAdvance();
 bindLayoutRefresh();
 
 loadSprites()
