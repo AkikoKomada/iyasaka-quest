@@ -99,17 +99,17 @@ export const NPCS = [
           'きっと 大盛況よ。',
         ];
       }
-      if (f.supporters.length >= 2 && !hasSupporter('elder')) {
+      if (f.postedAtHill && !hasSupporter('elder')) {
         addSupporter('elder', 'むらびとB');
         return [
-          '旅の青年の 話、聞いたわ。',
-          'むらの 者まで 応援してくれる…',
+          '丘の 看板、見てきたのね。',
+          '旅の青年の 話も 聞いたわ。',
           'わたしも 応援する。',
           'あなたたちの 未来が 広がるわ。',
         ];
       }
-      if (f.supporters.length >= 1) {
-        return ['旅の 若者が 応援してくれる みたいね。', 'もっと 届けて ちょうだい。'];
+      if (f.postedAtHill) {
+        return ['どうがの 力は 人を つなぐ…', '応援、続けましょう。'];
       }
       if (f.hasVideo) {
         return [
