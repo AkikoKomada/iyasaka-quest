@@ -70,7 +70,7 @@ function setHint(text) {
 function setUiMode() {
   document.body.classList.toggle('is-playing', state === 'play');
   if (touchControls) {
-    touchControls.setAttribute('aria-hidden', state === 'play' ? 'false' : 'true');
+    touchControls.style.display = isTouchDevice ? 'grid' : '';
   }
   layoutGame();
 }
@@ -82,15 +82,12 @@ function layoutGame() {
   const vw = vv?.width ?? window.innerWidth;
   const vh = vv?.height ?? window.innerHeight;
   const landscape = vw > vh;
+  const mobile = vw <= 900 || isTouchDevice;
 
-  const h1 = document.querySelector('h1');
-  const chromeH = (h1?.offsetHeight ?? 20) + (hint?.offsetHeight ?? 20) + 24;
-  const padControls = isTouchDevice && state === 'play'
-    ? (landscape ? 148 : 188)
-    : 0;
-  const sidePad = isTouchDevice && state === 'play' && landscape ? 148 : 16;
+  const chromeH = mobile ? (landscape ? 56 : 280) : 72;
+  const sidePad = mobile && landscape ? 200 : 32;
 
-  const availH = Math.max(120, vh - chromeH - padControls);
+  const availH = Math.max(120, vh - chromeH);
   const availW = Math.max(160, vw - sidePad);
 
   let h = Math.min(availH, availW * 0.75);
@@ -100,11 +97,9 @@ function layoutGame() {
     h = w * 0.75;
   }
 
-  gameFrame.style.setProperty('--game-w', `${Math.floor(w)}px`);
-  gameFrame.style.setProperty('--game-h', `${Math.floor(h)}px`);
-  gameFrame.style.aspectRatio = 'auto';
   gameFrame.style.width = `${Math.floor(w)}px`;
   gameFrame.style.height = `${Math.floor(h)}px`;
+  gameFrame.style.maxHeight = `${Math.floor(h)}px`;
 }
 
 function refreshHint() {
@@ -513,7 +508,6 @@ canvas.width = W;
 canvas.height = H;
 canvas.tabIndex = -1;
 
-const gameFrame = document.getElementById('frame');
 const kbInput = document.getElementById('kb');
 
 function focusGame() {
