@@ -20,9 +20,17 @@ const msgName = document.getElementById('msg-name');
 const msgText = document.getElementById('msg-text');
 const hint = document.getElementById('hint');
 const touchControls = document.getElementById('touch-controls');
+const gameFrame = document.getElementById('frame');
 
-const isTouchDevice = window.matchMedia('(hover: none) and (pointer: coarse)').matches
-  || navigator.maxTouchPoints > 0;
+function detectTouchDevice() {
+  if (navigator.maxTouchPoints > 0) return true;
+  if ('ontouchstart' in window) return true;
+  if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) return true;
+  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+}
+
+const isTouchDevice = detectTouchDevice();
+if (isTouchDevice) document.body.classList.add('is-touch');
 
 /** @typedef {'title'|'intro'|'play'|'dialogue'} State */
 /** @type {State} */
@@ -59,11 +67,49 @@ function setHint(text) {
   hint.textContent = text;
 }
 
+function setUiMode() {
+  document.body.classList.toggle('is-playing', state === 'play');
+  if (touchControls) {
+    touchControls.setAttribute('aria-hidden', state === 'play' ? 'false' : 'true');
+  }
+  layoutGame();
+}
+
+/** iPhone 向け — 画面サイズに合わせてゲーム枠を再計算 */
+function layoutGame() {
+  if (!gameFrame) return;
+  const vv = window.visualViewport;
+  const vw = vv?.width ?? window.innerWidth;
+  const vh = vv?.height ?? window.innerHeight;
+  const landscape = vw > vh;
+
+  const h1 = document.querySelector('h1');
+  const chromeH = (h1?.offsetHeight ?? 20) + (hint?.offsetHeight ?? 20) + 24;
+  const padControls = isTouchDevice && state === 'play'
+    ? (landscape ? 148 : 188)
+    : 0;
+  const sidePad = isTouchDevice && state === 'play' && landscape ? 148 : 16;
+
+  const availH = Math.max(120, vh - chromeH - padControls);
+  const availW = Math.max(160, vw - sidePad);
+
+  let h = Math.min(availH, availW * 0.75);
+  let w = h * (4 / 3);
+  if (w > availW) {
+    w = availW;
+    h = w * 0.75;
+  }
+
+  gameFrame.style.setProperty('--game-w', `${Math.floor(w)}px`);
+  gameFrame.style.setProperty('--game-h', `${Math.floor(h)}px`);
+  gameFrame.style.aspectRatio = 'auto';
+  gameFrame.style.width = `${Math.floor(w)}px`;
+  gameFrame.style.height = `${Math.floor(h)}px`;
+}
+
 function refreshHint() {
   const tap = isTouchDevice ? 'タップ' : 'クリック';
-  if (touchControls) {
-    touchControls.style.display = (isTouchDevice && state === 'play') ? 'grid' : 'none';
-  }
+  setUiMode();
   if (state === 'title') {
     canvas.style.cursor = 'pointer';
     setHint(`${tap} / Enter で はじめる`);
@@ -76,7 +122,7 @@ function refreshHint() {
   }
   canvas.style.cursor = 'default';
   const f = getFlags();
-  const move = isTouchDevice ? '左下の矢印' : '↑↓←→';
+  const move = isTouchDevice ? '下の矢印' : '↑↓←→';
   if (mapName === 'hill') {
     setHint(`← 西（左）: どうがむらへ もどる　${move} で あるく`);
   } else if (f.chapter2Complete) {
@@ -517,7 +563,7 @@ window.addEventListener('focus', () => focusGame());
 bindKeys();
 
 function bindTouchControls() {
-  if (!isTouchDevice || !touchControls) return;
+  if (!touchControls) return;
 
   /** @type {Record<string, keyof typeof keys>} */
   const dirMap = { up: 'up', down: 'down', left: 'left', right: 'right' };
@@ -531,13 +577,18 @@ function bindTouchControls() {
       e.preventDefault();
       e.stopPropagation();
       keys[key] = true;
+      btn.classList.add('pressed');
     };
     const release = (e) => {
       e.preventDefault();
       e.stopPropagation();
       keys[key] = false;
+      btn.classList.remove('pressed');
     };
 
+    btn.addEventListener('touchstart', press, { passive: false });
+    btn.addEventListener('touchend', release, { passive: false });
+    btn.addEventListener('touchcancel', release);
     btn.addEventListener('pointerdown', press);
     btn.addEventListener('pointerup', release);
     btn.addEventListener('pointercancel', release);
@@ -545,10 +596,60 @@ function bindTouchControls() {
   }
 }
 
+/** スワイプでも1マス移動（矢印の代わり） */
+function bindSwipeMove() {
+  let startX = 0;
+  let startY = 0;
+  let tracking = false;
+
+  canvas.addEventListener('touchstart', (e) => {
+    if (state !== 'play' || e.touches.length !== 1) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    tracking = true;
+  }, { passive: true });
+
+  canvas.addEventListener('touchend', (e) => {
+    if (!tracking || state !== 'play') return;
+    tracking = false;
+    const t = e.changedTouches[0];
+    if (!t) return;
+    const dx = t.clientX - startX;
+    const dy = t.clientY - startY;
+    const min = 28;
+    if (Math.abs(dx) < min && Math.abs(dy) < min) return;
+    e.preventDefault();
+    if (Math.abs(dx) > Math.abs(dy)) {
+      keys.left = dx < 0;
+      keys.right = dx > 0;
+    } else {
+      keys.up = dy < 0;
+      keys.down = dy > 0;
+    }
+    setTimeout(() => {
+      keys.up = false;
+      keys.down = false;
+      keys.left = false;
+      keys.right = false;
+    }, 120);
+  }, { passive: false });
+}
+
+function bindLayoutRefresh() {
+  const refresh = () => setTimeout(layoutGame, 50);
+  window.addEventListener('resize', refresh);
+  window.addEventListener('orientationchange', refresh);
+  window.visualViewport?.addEventListener('resize', refresh);
+  window.visualViewport?.addEventListener('scroll', refresh);
+}
+
 bindTouchControls();
+bindSwipeMove();
+bindLayoutRefresh();
 
 loadSprites()
   .then(() => {
+    layoutGame();
     refreshHint();
     requestAnimationFrame(loop);
   })
