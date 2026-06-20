@@ -518,8 +518,6 @@ bindKeys();
 
 function bindTouchControls() {
   if (!isTouchDevice || !touchControls) return;
-  touchControls.classList.add('visible');
-  touchControls.setAttribute('aria-hidden', 'false');
 
   /** @type {Record<string, keyof typeof keys>} */
   const dirMap = { up: 'up', down: 'down', left: 'left', right: 'right' };
