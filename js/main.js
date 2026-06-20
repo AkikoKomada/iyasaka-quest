@@ -19,6 +19,10 @@ const msgEl = document.getElementById('msg');
 const msgName = document.getElementById('msg-name');
 const msgText = document.getElementById('msg-text');
 const hint = document.getElementById('hint');
+const touchControls = document.getElementById('touch-controls');
+
+const isTouchDevice = window.matchMedia('(hover: none) and (pointer: coarse)').matches
+  || navigator.maxTouchPoints > 0;
 
 /** @typedef {'title'|'intro'|'play'|'dialogue'} State */
 /** @type {State} */
@@ -56,28 +60,33 @@ function setHint(text) {
 }
 
 function refreshHint() {
+  const tap = isTouchDevice ? 'タップ' : 'クリック';
+  if (touchControls) {
+    touchControls.style.display = (isTouchDevice && state === 'play') ? 'grid' : 'none';
+  }
   if (state === 'title') {
     canvas.style.cursor = 'pointer';
-    setHint('クリック / Enter で はじめる');
+    setHint(`${tap} / Enter で はじめる`);
     return;
   }
   if (state === 'intro' || state === 'dialogue') {
     canvas.style.cursor = 'pointer';
-    setHint('クリック / Enter / Space で つぎへ');
+    setHint(`${tap} / Enter / Space で つぎへ`);
     return;
   }
   canvas.style.cursor = 'default';
   const f = getFlags();
+  const move = isTouchDevice ? '左下の矢印' : '↑↓←→';
   if (mapName === 'hill') {
-    setHint('← 西（左）: どうがむらへ もどる');
+    setHint(`← 西（左）: どうがむらへ もどる　${move} で あるく`);
   } else if (f.chapter2Complete) {
-    setHint('↑↓←→ で あるく　第2章クリア！');
+    setHint(`${move} で あるく　第2章クリア！`);
   } else if (f.hasVideo && !f.postedAtHill) {
-    setHint('→ 東：告知の丘　中央の 大きな看板の前で Enter');
+    setHint(`${move} で あるく　→ 東：告知の丘　看板の前で ${tap}`);
   } else if (f.postedAtHill && f.supporters.length < 3) {
-    setHint('↑↓←→ 応援者を 増やそう（むらびとに 話しかけて）');
+    setHint(`${move} 応援者を 増やそう（むらびとに 話しかけて）`);
   } else {
-    setHint('↑↓←→ で あるく　Enter / クリック で はなす');
+    setHint(`${move} で あるく　${tap} で はなす`);
   }
 }
 
@@ -506,6 +515,39 @@ canvas.addEventListener('click', (e) => {
 gameFrame.addEventListener('pointerdown', () => focusGame());
 window.addEventListener('focus', () => focusGame());
 bindKeys();
+
+function bindTouchControls() {
+  if (!isTouchDevice || !touchControls) return;
+  touchControls.classList.add('visible');
+  touchControls.setAttribute('aria-hidden', 'false');
+
+  /** @type {Record<string, keyof typeof keys>} */
+  const dirMap = { up: 'up', down: 'down', left: 'left', right: 'right' };
+
+  for (const btn of touchControls.querySelectorAll('button[data-dir]')) {
+    const dir = btn.getAttribute('data-dir');
+    if (!dir || !(dir in dirMap)) continue;
+    const key = dirMap[dir];
+
+    const press = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      keys[key] = true;
+    };
+    const release = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      keys[key] = false;
+    };
+
+    btn.addEventListener('pointerdown', press);
+    btn.addEventListener('pointerup', release);
+    btn.addEventListener('pointercancel', release);
+    btn.addEventListener('pointerleave', release);
+  }
+}
+
+bindTouchControls();
 
 loadSprites()
   .then(() => {
