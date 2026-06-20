@@ -456,7 +456,7 @@ export function getInteractableLines(obj) {
 
 export const WORLD = {
   title: 'いやさかQUEST',
-  subtitle: '～ 3人の たび ～',
+  subtitle: '〜 異矢世界講演会への道 〜',
   intro: [
     'マッチョ・リョウ・みいこは',
     'いやさかの もりを めざして',
