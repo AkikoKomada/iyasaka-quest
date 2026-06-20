@@ -44,7 +44,8 @@ let cam = { cx: 0, cy: 0 };
 
 let moveLock = false;
 let moveTimer = 0;
-const MOVE_MS = 420;
+/** 1マス移動にかかる時間（ms）— 携帯はキーボードより速め */
+const MOVE_MS = isTouchDevice ? 240 : 420;
 
 /** @type {{ prev: ReturnType<typeof partyMembers>, next: ReturnType<typeof partyMembers>, elapsed: number } | null} */
 let moveAnim = null;
