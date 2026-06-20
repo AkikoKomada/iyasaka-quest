@@ -6,6 +6,11 @@ import { partyMembers, trailStepAt, URIBOU_LAG } from './party.js';
 export const W = VW * TILE;
 export const H = VH * TILE;
 
+function isDesktopUi() {
+  return typeof matchMedia !== 'undefined'
+    && matchMedia('(min-width: 901px) and (hover: hover)').matches;
+}
+
 /** タイル隙間（縦線）防止 — カメラを整数pxにスナップ */
 export function snapCam(camX, camY) {
   return { cx: Math.round(camX), cy: Math.round(camY) };
@@ -146,14 +151,14 @@ export function drawTitle(ctx, title, subtitle, frame) {
 
   ctx.textAlign = 'center';
   ctx.fillStyle = '#f8d830';
-  ctx.font = 'bold 20px monospace';
+  ctx.font = isDesktopUi() ? 'bold 26px monospace' : 'bold 20px monospace';
   ctx.fillText(title, W / 2, H / 2 - 20);
   ctx.fillStyle = '#e8f0ff';
-  ctx.font = '11px monospace';
+  ctx.font = isDesktopUi() ? '14px monospace' : '11px monospace';
   ctx.fillText(subtitle, W / 2, H / 2 + 4);
 
   ctx.fillStyle = '#8090c0';
-  ctx.font = '10px monospace';
+  ctx.font = isDesktopUi() ? '13px monospace' : '10px monospace';
   if (Math.floor(frame / 30) % 2 === 0) {
     ctx.fillText('▼  ENTER で はじめる', W / 2, H - 24);
   }
@@ -180,23 +185,26 @@ export function drawMapOverlay(ctx, mapName, camX, camY) {
 
 /** @param {CanvasRenderingContext2D} ctx */
 export function drawStatus(ctx, mapName, flags) {
+  const desk = isDesktopUi();
+  const barH = desk ? 18 : 14;
+  const baseY = desk ? 14 : 10;
   ctx.fillStyle = 'rgba(0,0,20,0.55)';
-  ctx.fillRect(0, 0, W, 14);
+  ctx.fillRect(0, 0, W, barH);
   ctx.fillStyle = '#a0b8e0';
-  ctx.font = '9px monospace';
+  ctx.font = desk ? '12px monospace' : '9px monospace';
   ctx.textAlign = 'left';
   const places = { outdoor: 'どうがむら', indoor: 'アキコの家', hill: '告知の丘' };
   const place = places[mapName] ?? mapName;
-  ctx.fillText(`${place}  マッチョ・リョウ・みいこ`, 4, 10);
+  ctx.fillText(`${place}  マッチョ・リョウ・みいこ`, 4, baseY);
   ctx.textAlign = 'right';
   if (flags.supporters?.length) {
     ctx.fillStyle = '#90e8a0';
-    ctx.fillText(`応援 ${flags.supporters.length}人`, W - 4, 10);
+    ctx.fillText(`応援 ${flags.supporters.length}人`, W - 4, baseY);
   } else if (flags.hasVideo && getIyasakaVideo()) {
-    drawIyasakaVideo(ctx, W - 36, 1, 32, 12);
+    drawIyasakaVideo(ctx, W - (desk ? 42 : 36), 1, desk ? 38 : 32, desk ? 14 : 12);
   } else if (flags.hasVideo) {
     ctx.fillStyle = '#f8d830';
-    ctx.fillText('いやさかのどうが', W - 4, 10);
+    ctx.fillText('いやさかのどうが', W - 4, baseY);
   }
 }
 
