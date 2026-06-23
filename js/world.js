@@ -1,9 +1,9 @@
 /** 異矢世界 — NPC・会話・フラグ・第2章 */
 
-import { HILL_BOARD_TX, HILL_BOARD_TY } from './tiles.js?v=20250623a';
+import { HILL_BOARD_TX, HILL_BOARD_TY } from './tiles.js?v=20250623b';
 import {
   createDefaultFlags, normalizeFlags, hasAllRequiredSupporters, REQUIRED_SUPPORTERS,
-} from './save.js?v=20250623a';
+} from './save.js?v=20250623b';
 
 /** @typedef {ReturnType<typeof createDefaultFlags>} GameFlags */
 

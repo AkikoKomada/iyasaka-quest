@@ -1,19 +1,22 @@
 import {
   W, H, drawMap, drawMapOverlay, drawEntities, drawTitle, drawStatus, cameraForPlayer,
   facingOffset, dirToward, snapCam,
-} from './render.js?v=20250623a';
-import { DISPLAY_H } from './sprites.js?v=20250623a';
-import { TILE, getMap, isWalkable, tileAt } from './tiles.js?v=20250623a';
+} from './render.js?v=20250623b';
+import { DISPLAY_H } from './sprites.js?v=20250623b';
+import { TILE, getMap, isWalkable, tileAt } from './tiles.js?v=20250623b';
 import {
   WORLD, npcsOnMap, getNpcLines, markTalked, findDoor, findMapExit,
   findInteractable, getInteractableLines, getFlags, setFlag,
   applyFlags, snapshotFlags, setPersistHandler,
-} from './world.js?v=20250623a';
-import { readSave, writeSave, createDefaultSave, hasAllRequiredSupporters } from './save.js?v=20250623a';
-import { loadSprites } from './sprites.js?v=20250623a';
+} from './world.js?v=20250623b';
+import {
+  readSave, writeSave, createDefaultSave, hasAllRequiredSupporters,
+  isRestorableSave, clearSave,
+} from './save.js?v=20250623b';
+import { loadSprites } from './sprites.js?v=20250623b';
 import {
   createPartyTrail, recordLeaderStep, reseedTrail, heroPos, getFacing, partyMembers,
-} from './party.js?v=20250623a';
+} from './party.js?v=20250623b';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -93,19 +96,56 @@ function applySave(save) {
   cam = cameraForPlayer(currentMap(), hero.tx, hero.ty);
 }
 
+function resetToFreshStart() {
+  const fresh = createDefaultSave();
+  applySave(fresh);
+  state = 'title';
+  introIndex = 0;
+  dialogue = null;
+  talkFacing = null;
+  moveLock = false;
+  moveAnim = null;
+  msgEl.classList.remove('open', 'has-video');
+  writeSave(fresh);
+}
+
 function restoreFromSave(save) {
   applySave(save);
+  moveLock = false;
+  moveAnim = null;
+  if (save.state === 'title') {
+    state = 'title';
+    msgEl.classList.remove('open', 'has-video');
+    dialogue = null;
+    talkFacing = null;
+    return;
+  }
   if (save.state === 'intro') {
     state = 'intro';
     msgEl.classList.add('open');
     msgName.textContent = '';
     msgText.textContent = WORLD.intro[introIndex] ?? WORLD.intro[0];
+    dialogue = null;
+    talkFacing = null;
     return;
   }
   state = 'play';
   msgEl.classList.remove('open', 'has-video');
   dialogue = null;
   talkFacing = null;
+}
+
+function bootstrapFromSave() {
+  const saved = readSave();
+  if (saved?.started && isRestorableSave(saved)) {
+    restoreFromSave(saved);
+    return;
+  }
+  if (saved?.started) {
+    console.warn('[iyasaka-quest] invalid save — resetting to title');
+    clearSave();
+  }
+  resetToFreshStart();
 }
 
 setPersistHandler(persistGame);
@@ -722,12 +762,7 @@ bindLayoutRefresh();
 
 loadSprites()
   .then(() => {
-    const saved = readSave();
-    if (saved?.started) {
-      restoreFromSave(saved);
-    } else {
-      writeSave(createDefaultSave());
-    }
+    bootstrapFromSave();
     layoutGame();
     refreshHint();
     requestAnimationFrame(loop);

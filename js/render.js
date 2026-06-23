@@ -1,7 +1,7 @@
-import { TILE, VW, VH, tileAt, HILL_BOARD_TX, HILL_BOARD_TY } from './tiles.js';
-import { getSprite, drawTile, spriteDrawPos, DISPLAY_W, DISPLAY_H, drawIyasakaVideo, getIyasakaVideo } from './sprites.js';
-import { npcsOnMap, getFlags } from './world.js?v=20250623a';
-import { partyMembers, trailStepAt, URIBOU_LAG } from './party.js';
+import { TILE, VW, VH, tileAt, HILL_BOARD_TX, HILL_BOARD_TY } from './tiles.js?v=20250623b';
+import { getSprite, drawTile, spriteDrawPos, DISPLAY_W, DISPLAY_H, drawIyasakaVideo, getIyasakaVideo } from './sprites.js?v=20250623b';
+import { npcsOnMap, getFlags } from './world.js?v=20250623b';
+import { partyMembers, trailStepAt, URIBOU_LAG } from './party.js?v=20250623b';
 
 export const W = VW * TILE;
 export const H = VH * TILE;
@@ -50,6 +50,7 @@ export function drawEntity(ctx, spriteKey, tx, ty, camX, camY, opts = {}) {
   const { isHero = false, dir = 'down', bob = 0 } = opts;
   const { cx, cy } = snapCam(camX, camY);
   const spr = getSprite(spriteKey);
+  if (!spr) return;
   const { x, y } = spriteDrawPos(tx, ty, cx, cy, TILE, bob);
 
   if (isHero) {

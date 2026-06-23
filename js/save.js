@@ -95,11 +95,37 @@ export function loadSave(data = {}) {
   };
 }
 
+const VALID_MAPS = new Set(['outdoor', 'indoor', 'hill']);
+const VALID_STATES = new Set(['title', 'intro', 'play', 'dialogue']);
+
+/** @param {Partial<GameSave> | null | undefined} save */
+export function isRestorableSave(save) {
+  if (!save?.started) return false;
+  if (!VALID_MAPS.has(save.mapName)) return false;
+  if (!VALID_STATES.has(save.state)) return false;
+  const history = save.trail?.history;
+  if (!Array.isArray(history) || history.length === 0) return false;
+  return history.every(
+    (step) =>
+      step &&
+      Number.isFinite(step.tx) &&
+      Number.isFinite(step.ty) &&
+      typeof step.dir === 'string'
+  );
+}
+
+export function clearSave() {
+  try {
+    localStorage.removeItem(SAVE_KEY);
+  } catch { /* private mode */ }
+}
+
 export function readSave() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
-    return loadSave(JSON.parse(raw));
+    const save = loadSave(JSON.parse(raw));
+    return isRestorableSave(save) || !save.started ? save : null;
   } catch {
     return null;
   }
