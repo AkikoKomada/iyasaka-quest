@@ -1,6 +1,11 @@
 /** 異矢世界 — NPC・会話・フラグ・第2章 */
 
-import { HILL_BOARD_TX, HILL_BOARD_TY } from './tiles.js';
+import { HILL_BOARD_TX, HILL_BOARD_TY } from './tiles.js?v=20250623a';
+import {
+  createDefaultFlags, normalizeFlags, hasAllRequiredSupporters, REQUIRED_SUPPORTERS,
+} from './save.js?v=20250623a';
+
+/** @typedef {ReturnType<typeof createDefaultFlags>} GameFlags */
 
 /** @typedef {'outdoor'|'indoor'|'hill'} MapName */
 
@@ -101,9 +106,17 @@ export const NPCS = [
       }
       if (f.postedAtHill && !hasSupporter('elder')) {
         addSupporter('elder', 'むらびとB');
+        if (hasSupporter('traveler')) {
+          return [
+            '丘の 看板、見てきたのね。',
+            '旅の青年の 話も 聞いたわ。',
+            'わたしも 応援する。',
+            'あなたたちの 未来が 広がるわ。',
+          ];
+        }
         return [
           '丘の 看板、見てきたのね。',
-          '旅の青年の 話も 聞いたわ。',
+          'いやさかのどうが… 心が 動いた。',
           'わたしも 応援する。',
           'あなたたちの 未来が 広がるわ。',
         ];
@@ -146,7 +159,7 @@ export const NPCS = [
           '…また マップ つくるから 楽しみに！',
         ];
       }
-      if (f.supporters.length >= 3 && f.postedAtHill) {
+      if (hasAllRequiredSupporters(f.supporters) && f.postedAtHill) {
         setFlag('chapter2Complete', true);
         return [
           'すごい！ 応援が 3人に なった！',
@@ -157,9 +170,17 @@ export const NPCS = [
         ];
       }
       if (f.postedAtHill) {
+        if (hasSupporter('traveler')) {
+          return [
+            '看板に どうがを 貼れたね！',
+            '旅の青年が 応援してくれてる。',
+            'むらに 戻って 他の ひとも',
+            '話しかけてみて。',
+          ];
+        }
         return [
           '看板に どうがを 貼れたね！',
-          '旅の青年が 応援してくれてる。',
+          '丘の 旅人に 話しかけてみて。',
           'むらに 戻って 他の ひとも',
           '話しかけてみて。',
         ];
@@ -173,7 +194,7 @@ export const NPCS = [
           '→ 告知の丘 へ 行こう！',
         ];
       }
-      if (f.talkCount >= 3 && !f.hasVideo) {
+      if (hasMetVillagers() && !f.hasVideo) {
         return [
           'お、よく 話を 聞いたな。',
           'アキコの いえに 行けば',
@@ -245,7 +266,7 @@ export const NPCS = [
           '応援してくれる人が 増えるはずよ。',
         ];
       }
-      if (f.talkCount >= 2 && !f.hasVideo) {
+      if (hasMetVillagers() && !f.hasVideo) {
         return [
           'みんなの 話、聞いたのね。',
           'この「いやさかのどうが」',
@@ -369,26 +390,50 @@ export const MAP_EXITS = [
   { from: 'hill', x: 0, y: 11, to: 'outdoor', tx: 38, ty: 19 },
 ];
 
-/** @type {Record<string, boolean | number | { id: string, name: string }[]>} */
-const flags = {
-  metKochan: false,
-  hasVideo: false,
-  talkCount: 0,
-  talked: {},
-  chapter2Unlocked: false,
-  chapter2IntroSeen: false,
-  chapter2Complete: false,
-  postedAtHill: false,
-  uribouFollows: false,
-  supporters: /** @type {{ id: string, name: string }[]} */ ([]),
-};
+/** @type {GameFlags} */
+let flags = createDefaultFlags();
+
+/** @type {(() => void) | null} */
+let persistHandler = null;
+
+export function setPersistHandler(fn) {
+  persistHandler = fn;
+}
+
+function requestPersist() {
+  persistHandler?.();
+}
 
 export function getFlags() {
   return flags;
 }
 
+/** @param {Partial<GameFlags>} data */
+export function applyFlags(data) {
+  flags = normalizeFlags({
+    ...createDefaultFlags(),
+    ...data,
+    talked: { ...createDefaultFlags().talked, ...(data.talked || {}) },
+    supporters: Array.isArray(data.supporters) ? [...data.supporters] : [],
+  });
+}
+
+export function snapshotFlags() {
+  return {
+    ...flags,
+    talked: { ...flags.talked },
+    supporters: flags.supporters.map((s) => ({ ...s })),
+  };
+}
+
 export function setFlag(key, val) {
   flags[key] = val;
+  requestPersist();
+}
+
+/** むらびとA・B と話した（どうが入手の前提） */
+export function hasMetVillagers() {
+  return !!(flags.talked?.murabito_a && flags.talked?.elder);
 }
 
 export function hasSupporter(id) {
@@ -398,18 +443,17 @@ export function hasSupporter(id) {
 export function addSupporter(id, name) {
   if (hasSupporter(id)) return;
   flags.supporters.push({ id, name });
-}
-
-export function bumpTalk() {
-  flags.talkCount = (flags.talkCount || 0) + 1;
+  requestPersist();
 }
 
 export function markTalked(id) {
   if (!flags.talked[id]) {
     flags.talked[id] = true;
-    bumpTalk();
+    requestPersist();
   }
 }
+
+export { REQUIRED_SUPPORTERS, hasAllRequiredSupporters };
 
 export function getNpcLines(npc) {
   return typeof npc.lines === 'function' ? npc.lines() : npc.lines;
@@ -455,8 +499,8 @@ export function getInteractableLines(obj) {
 }
 
 export const WORLD = {
-  title: 'いやさかQUEST',
-  subtitle: '〜 異矢世界講演会への道 〜',
+  title: '異矢世界QUEST',
+  subtitle: '〜 異矢世界（いやさかい）講演会への道 〜',
   intro: [
     'マッチョ・リョウ・みいこは',
     'いやさかの もりを めざして',

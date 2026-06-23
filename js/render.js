@@ -1,6 +1,6 @@
 import { TILE, VW, VH, tileAt, HILL_BOARD_TX, HILL_BOARD_TY } from './tiles.js';
 import { getSprite, drawTile, spriteDrawPos, DISPLAY_W, DISPLAY_H, drawIyasakaVideo, getIyasakaVideo } from './sprites.js';
-import { npcsOnMap, getFlags } from './world.js';
+import { npcsOnMap, getFlags } from './world.js?v=20250623a';
 import { partyMembers, trailStepAt, URIBOU_LAG } from './party.js';
 
 export const W = VW * TILE;

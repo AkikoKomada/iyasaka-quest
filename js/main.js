@@ -1,17 +1,19 @@
 import {
   W, H, drawMap, drawMapOverlay, drawEntities, drawTitle, drawStatus, cameraForPlayer,
   facingOffset, dirToward, snapCam,
-} from './render.js';
-import { DISPLAY_H } from './sprites.js';
-import { TILE, getMap, isWalkable, tileAt } from './tiles.js';
+} from './render.js?v=20250623a';
+import { DISPLAY_H } from './sprites.js?v=20250623a';
+import { TILE, getMap, isWalkable, tileAt } from './tiles.js?v=20250623a';
 import {
   WORLD, npcsOnMap, getNpcLines, markTalked, findDoor, findMapExit,
   findInteractable, getInteractableLines, getFlags, setFlag,
-} from './world.js';
-import { loadSprites } from './sprites.js';
+  applyFlags, snapshotFlags, setPersistHandler,
+} from './world.js?v=20250623a';
+import { readSave, writeSave, createDefaultSave, hasAllRequiredSupporters } from './save.js?v=20250623a';
+import { loadSprites } from './sprites.js?v=20250623a';
 import {
   createPartyTrail, recordLeaderStep, reseedTrail, heroPos, getFacing, partyMembers,
-} from './party.js';
+} from './party.js?v=20250623a';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -56,6 +58,57 @@ let talkFacing = null;
 /** @type {{ npc: import('./world.js').NpcDef, lines: string[], index: number } | null} */
 let dialogue = null;
 let introIndex = 0;
+
+function heroFromTrail() {
+  return heroPos(trail);
+}
+
+function persistGame() {
+  if (state === 'title') return;
+  writeSave({
+    v: 1,
+    started: state !== 'title',
+    state: state === 'dialogue' ? 'play' : state,
+    mapName,
+    dir,
+    introIndex,
+    trail: {
+      facing: trail.facing,
+      history: trail.history.slice(-120),
+    },
+    flags: snapshotFlags(),
+  });
+}
+
+function applySave(save) {
+  applyFlags(save.flags);
+  mapName = save.mapName || 'outdoor';
+  dir = save.dir || 'down';
+  introIndex = save.introIndex || 0;
+  trail.facing = save.trail?.facing || 'down';
+  trail.history = Array.isArray(save.trail?.history) && save.trail.history.length
+    ? save.trail.history.slice(-120)
+    : createPartyTrail(20, 16, 'down').history;
+  const hero = heroFromTrail();
+  cam = cameraForPlayer(currentMap(), hero.tx, hero.ty);
+}
+
+function restoreFromSave(save) {
+  applySave(save);
+  if (save.state === 'intro') {
+    state = 'intro';
+    msgEl.classList.add('open');
+    msgName.textContent = '';
+    msgText.textContent = WORLD.intro[introIndex] ?? WORLD.intro[0];
+    return;
+  }
+  state = 'play';
+  msgEl.classList.remove('open', 'has-video');
+  dialogue = null;
+  talkFacing = null;
+}
+
+setPersistHandler(persistGame);
 
 const keys = { up: false, down: false, left: false, right: false };
 let lastConfirmAt = 0;
@@ -126,7 +179,7 @@ function refreshHint() {
     setHint(`${move} で あるく　第2章クリア！`);
   } else if (f.hasVideo && !f.postedAtHill) {
     setHint(`${move} で あるく　→ 東：告知の丘　看板の前で ${tap}`);
-  } else if (f.postedAtHill && f.supporters.length < 3) {
+  } else if (f.postedAtHill && !hasAllRequiredSupporters(f.supporters)) {
     setHint(`${move} 応援者を 増やそう（むらびとに 話しかけて）`);
   } else {
     setHint(`${move} で あるく　${tap} で はなす`);
@@ -180,6 +233,7 @@ function closeDialogue() {
 
   state = 'play';
   refreshHint();
+  persistGame();
 }
 
 function maybeChapter2Intro() {
@@ -204,7 +258,7 @@ function advanceDialogue() {
 function findTalkTarget() {
   const hero = heroPos(trail);
   const [fdx, fdy] = facingOffset(dir);
-  const npcs = npcsOnMap(mapName).filter((n) => n.id !== 'sign');
+  const npcs = npcsOnMap(mapName);
   if (!npcs.length) return null;
 
   /** @type {{ npc: typeof npcs[0], score: number }[]} */
@@ -237,7 +291,6 @@ function npcAtClick(clientX, clientY) {
   let best = Infinity;
 
   for (const n of npcsOnMap(mapName)) {
-    if (n.id === 'sign') continue;
     const cx = n.x * TILE - viewCam.cx + TILE / 2;
     const cy = n.y * TILE - viewCam.cy + TILE - DISPLAY_H / 2;
     if (
@@ -278,6 +331,7 @@ function tryMapExit() {
   reseedTrail(trail, exit.tx, exit.ty, dir);
   cam = cameraForPlayer(currentMap(), heroPos(trail).tx, heroPos(trail).ty);
   refreshHint();
+  persistGame();
 }
 
 function tryTalk(preferredNpc = null) {
@@ -298,6 +352,7 @@ function tryDoor() {
   if (fromIndoor && mapName === 'outdoor') {
     setTimeout(maybeChapter2Intro, MOVE_MS);
   }
+  persistGame();
 }
 
 function tryMove(nx, ny, newDir) {
@@ -305,9 +360,7 @@ function tryMove(nx, ny, newDir) {
   dir = newDir;
   const map = currentMap();
   if (!isWalkable(map, nx, ny)) return;
-  const blocked = npcsOnMap(mapName).some(
-    (n) => n.x === nx && n.y === ny && n.id !== 'sign'
-  );
+  const blocked = npcsOnMap(mapName).some((n) => n.x === nx && n.y === ny);
   if (blocked) return;
 
   const prev = partyMembers(trail);
@@ -348,6 +401,7 @@ function interact() {
     msgName.textContent = '';
     msgText.textContent = WORLD.intro[0];
     refreshHint();
+    persistGame();
     return;
   }
   if (state === 'intro') {
@@ -355,6 +409,7 @@ function interact() {
       introIndex += 1;
       msgText.textContent = WORLD.intro[introIndex];
       refreshHint();
+      persistGame();
       return;
     }
     msgEl.classList.remove('open');
@@ -362,6 +417,7 @@ function interact() {
     dir = getFacing(trail);
     cam = cameraForPlayer(currentMap(), heroPos(trail).tx, heroPos(trail).ty);
     refreshHint();
+    persistGame();
     return;
   }
   if (state === 'dialogue') {
@@ -397,6 +453,7 @@ function update(dt) {
       moveLock = false;
       moveAnim = null;
       tryMapExit();
+      persistGame();
     }
   }
   handleInput();
@@ -665,6 +722,12 @@ bindLayoutRefresh();
 
 loadSprites()
   .then(() => {
+    const saved = readSave();
+    if (saved?.started) {
+      restoreFromSave(saved);
+    } else {
+      writeSave(createDefaultSave());
+    }
     layoutGame();
     refreshHint();
     requestAnimationFrame(loop);
