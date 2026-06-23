@@ -14,7 +14,6 @@ import { getSprite, DISPLAY_W, DISPLAY_H } from './sprites.js?v=20250623d';
  * @property {string} speaker
  * @property {string} text
  * @property {OpeningEffect} [effect]
- * @property {boolean} [titleCard]
  */
 
 /** @type {OpeningStep[]} */
@@ -87,7 +86,7 @@ export const OPENING_STEPS = [
     speaker: '',
     text: 'これは、\n3人の想いが、\nみんなの応援で実現していく物語。',
   },
-  { bg: 'black', chars: null, speaker: '', text: '', titleCard: true },
+  { bg: 'black', chars: null, speaker: '', text: '応援は、道になる。' },
 ];
 
 const CHAR_LAYOUT = {
@@ -199,14 +198,4 @@ export function drawOpening(ctx, stepIndex, frame) {
   drawBg(ctx, step.bg);
   drawParty(ctx, step.chars);
   drawEffects(ctx, step.effect || 'none', frame);
-
-  if (step.titleCard) {
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#f8d830';
-    ctx.font = 'bold 22px monospace';
-    ctx.fillText('異矢世界QUEST', W / 2, H / 2 - 8);
-    ctx.fillStyle = '#c8d8f0';
-    ctx.font = '11px monospace';
-    ctx.fillText('〜 異矢世界（いやさかい）講演会への道 〜', W / 2, H / 2 + 18);
-  }
 }
