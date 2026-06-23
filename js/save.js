@@ -26,12 +26,21 @@ export function hasAllRequiredSupporters(supporters) {
   return REQUIRED_SUPPORTERS.every((id) => ids.has(id));
 }
 
+/** むらびとA・むらびとB（elder）と会話済みか */
+function hasMetVillagersInFlags(flags) {
+  return !!(flags.talked?.murabito_a && flags.talked?.elder);
+}
+
 /** 起動時 — フラグの矛盾だけ補正 */
 /** @param {import('./world.js').GameFlags} flags */
 export function normalizeFlags(flags) {
   if (!flags.talked || typeof flags.talked !== 'object') flags.talked = {};
   if (!Array.isArray(flags.supporters)) flags.supporters = [];
 
+  if (flags.hasVideo && !hasMetVillagersInFlags(flags)) {
+    flags.hasVideo = false;
+    flags.chapter2Unlocked = false;
+  }
   if (flags.hasVideo) flags.chapter2Unlocked = true;
   if (flags.postedAtHill && !flags.hasVideo) flags.postedAtHill = false;
 

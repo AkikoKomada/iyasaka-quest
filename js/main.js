@@ -1,22 +1,22 @@
 import {
   W, H, drawMap, drawMapOverlay, drawEntities, drawTitle, drawStatus, cameraForPlayer,
   facingOffset, dirToward, snapCam,
-} from './render.js?v=20250623b';
-import { DISPLAY_H } from './sprites.js?v=20250623b';
-import { TILE, getMap, isWalkable, tileAt } from './tiles.js?v=20250623b';
+} from './render.js?v=20250623c';
+import { DISPLAY_H } from './sprites.js?v=20250623c';
+import { TILE, getMap, isWalkable, tileAt } from './tiles.js?v=20250623c';
 import {
   WORLD, npcsOnMap, getNpcLines, markTalked, findDoor, findMapExit,
   findInteractable, getInteractableLines, getFlags, setFlag,
-  applyFlags, snapshotFlags, setPersistHandler,
-} from './world.js?v=20250623b';
+  applyFlags, snapshotFlags, setPersistHandler, hasMetVillagers,
+} from './world.js?v=20250623c';
 import {
   readSave, writeSave, createDefaultSave, hasAllRequiredSupporters,
   isRestorableSave, clearSave,
-} from './save.js?v=20250623b';
-import { loadSprites } from './sprites.js?v=20250623b';
+} from './save.js?v=20250623c';
+import { loadSprites } from './sprites.js?v=20250623c';
 import {
   createPartyTrail, recordLeaderStep, reseedTrail, heroPos, getFacing, partyMembers,
-} from './party.js?v=20250623b';
+} from './party.js?v=20250623c';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -232,11 +232,12 @@ function syncMsgVideo() {
     return;
   }
   const isAkiko = dialogue.npc.id === 'akiko';
-  if (isAkiko && dialogue.index >= 2 && !getFlags().hasVideo) {
+  const villagersMet = hasMetVillagers();
+  if (isAkiko && villagersMet && dialogue.index >= 2 && !getFlags().hasVideo) {
     setFlag('hasVideo', true);
     setFlag('chapter2Unlocked', true);
   }
-  const show = isAkiko && getFlags().hasVideo && dialogue.index >= 2;
+  const show = isAkiko && villagersMet && getFlags().hasVideo && dialogue.index >= 2;
   msgEl.classList.toggle('has-video', show);
 }
 

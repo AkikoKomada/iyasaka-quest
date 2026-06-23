@@ -1,7 +1,7 @@
-import { TILE, VW, VH, tileAt, HILL_BOARD_TX, HILL_BOARD_TY } from './tiles.js?v=20250623b';
-import { getSprite, drawTile, spriteDrawPos, DISPLAY_W, DISPLAY_H, drawIyasakaVideo, getIyasakaVideo } from './sprites.js?v=20250623b';
-import { npcsOnMap, getFlags } from './world.js?v=20250623b';
-import { partyMembers, trailStepAt, URIBOU_LAG } from './party.js?v=20250623b';
+import { TILE, VW, VH, tileAt, HILL_BOARD_TX, HILL_BOARD_TY } from './tiles.js?v=20250623c';
+import { getSprite, drawTile, spriteDrawPos, DISPLAY_W, DISPLAY_H, drawIyasakaVideo, getIyasakaVideo } from './sprites.js?v=20250623c';
+import { npcsOnMap, getFlags } from './world.js?v=20250623c';
+import { partyMembers, trailStepAt, URIBOU_LAG } from './party.js?v=20250623c';
 
 export const W = VW * TILE;
 export const H = VH * TILE;
@@ -9,6 +9,47 @@ export const H = VH * TILE;
 function isDesktopUi() {
   return typeof matchMedia !== 'undefined'
     && matchMedia('(min-width: 901px) and (hover: hover)').matches;
+}
+
+const TITLE_PAD = 16;
+
+/** @param {CanvasRenderingContext2D} ctx */
+function fitFontSize(ctx, text, maxW, startSize, minSize, weight = '') {
+  let size = startSize;
+  while (size >= minSize) {
+    ctx.font = `${weight}${size}px monospace`;
+    if (ctx.measureText(text).width <= maxW) return size;
+    size -= 1;
+  }
+  return minSize;
+}
+
+/** @param {CanvasRenderingContext2D} ctx */
+function wrapLines(ctx, text, maxW) {
+  /** @type {string[]} */
+  const lines = [];
+  let line = '';
+  for (const ch of text) {
+    const test = line + ch;
+    if (line && ctx.measureText(test).width > maxW) {
+      lines.push(line);
+      line = ch;
+    } else {
+      line = test;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+/** @param {CanvasRenderingContext2D} ctx */
+function truncateToWidth(ctx, text, maxW) {
+  if (ctx.measureText(text).width <= maxW) return text;
+  let out = text;
+  while (out.length > 1 && ctx.measureText(`${out}…`).width > maxW) {
+    out = out.slice(0, -1);
+  }
+  return out.length < text.length ? `${out}…` : out;
 }
 
 /** タイル隙間（縦線）防止 — カメラを整数pxにスナップ */
@@ -151,15 +192,36 @@ export function drawTitle(ctx, title, subtitle, frame) {
   }
 
   ctx.textAlign = 'center';
+  const maxW = W - TITLE_PAD * 2;
+  const desk = isDesktopUi();
+
   ctx.fillStyle = '#f8d830';
-  ctx.font = isDesktopUi() ? 'bold 26px monospace' : 'bold 20px monospace';
-  ctx.fillText(title, W / 2, H / 2 - 20);
+  const titleSize = fitFontSize(ctx, title, maxW, desk ? 22 : 18, desk ? 14 : 12, 'bold ');
+  ctx.font = `bold ${titleSize}px monospace`;
+  ctx.fillText(title, W / 2, H / 2 - (desk ? 22 : 18));
+
   ctx.fillStyle = '#e8f0ff';
-  ctx.font = isDesktopUi() ? '14px monospace' : '11px monospace';
-  ctx.fillText(subtitle, W / 2, H / 2 + 4);
+  let subSize = desk ? 11 : 9;
+  const subMin = desk ? 8 : 7;
+  /** @type {string[]} */
+  let subLines = [];
+  while (subSize >= subMin) {
+    ctx.font = `${subSize}px monospace`;
+    subLines = wrapLines(ctx, subtitle, maxW);
+    if (subLines.length <= 2) break;
+    subSize -= 1;
+  }
+  ctx.font = `${subSize}px monospace`;
+  subLines = wrapLines(ctx, subtitle, maxW);
+  const lineH = subSize + 3;
+  const subY = H / 2 + 2;
+  subLines.forEach((line, i) => {
+    ctx.fillText(line, W / 2, subY + i * lineH);
+  });
 
   ctx.fillStyle = '#8090c0';
-  ctx.font = isDesktopUi() ? '13px monospace' : '10px monospace';
+  const promptSize = fitFontSize(ctx, '▼  ENTER で はじめる', maxW, desk ? 12 : 10, 8);
+  ctx.font = `${promptSize}px monospace`;
   if (Math.floor(frame / 30) % 2 === 0) {
     ctx.fillText('▼  ENTER で はじめる', W / 2, H - 24);
   }
@@ -189,23 +251,48 @@ export function drawStatus(ctx, mapName, flags) {
   const desk = isDesktopUi();
   const barH = desk ? 18 : 14;
   const baseY = desk ? 14 : 10;
+  const pad = 4;
   ctx.fillStyle = 'rgba(0,0,20,0.55)';
   ctx.fillRect(0, 0, W, barH);
-  ctx.fillStyle = '#a0b8e0';
   ctx.font = desk ? '12px monospace' : '9px monospace';
-  ctx.textAlign = 'left';
+
+  let rightText = '';
+  let rightMode = 'none';
+  if (flags.supporters?.length) {
+    rightText = `応援 ${flags.supporters.length}人`;
+    rightMode = 'text';
+  } else if (flags.hasVideo && getIyasakaVideo()) {
+    rightMode = 'video';
+  } else if (flags.hasVideo) {
+    rightText = 'いやさかのどうが';
+    rightMode = 'text';
+  }
+
+  let rightReserve = pad;
+  if (rightMode === 'video') {
+    rightReserve = (desk ? 42 : 36) + pad;
+  } else if (rightText) {
+    ctx.fillStyle = flags.supporters?.length ? '#90e8a0' : '#f8d830';
+    rightReserve = ctx.measureText(rightText).width + pad * 2;
+  }
+
   const places = { outdoor: 'どうがむら', indoor: 'アキコの家', hill: '告知の丘' };
   const place = places[mapName] ?? mapName;
-  ctx.fillText(`${place}  マッチョ・リョウ・みいこ`, 4, baseY);
+  const fullLeft = flags.supporters?.length
+    ? place
+    : `${place}  マッチョ・リョウ・みいこ`;
+  const maxLeftW = Math.max(40, W - rightReserve - pad);
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#a0b8e0';
+  ctx.fillText(truncateToWidth(ctx, fullLeft, maxLeftW), pad, baseY);
+
   ctx.textAlign = 'right';
-  if (flags.supporters?.length) {
-    ctx.fillStyle = '#90e8a0';
-    ctx.fillText(`応援 ${flags.supporters.length}人`, W - 4, baseY);
-  } else if (flags.hasVideo && getIyasakaVideo()) {
+  if (rightMode === 'video') {
     drawIyasakaVideo(ctx, W - (desk ? 42 : 36), 1, desk ? 38 : 32, desk ? 14 : 12);
-  } else if (flags.hasVideo) {
-    ctx.fillStyle = '#f8d830';
-    ctx.fillText('いやさかのどうが', W - 4, baseY);
+  } else if (rightText) {
+    ctx.fillStyle = flags.supporters?.length ? '#90e8a0' : '#f8d830';
+    ctx.fillText(rightText, W - pad, baseY);
   }
 }
 
