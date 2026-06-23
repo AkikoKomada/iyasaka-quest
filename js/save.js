@@ -59,6 +59,7 @@ export function normalizeFlags(flags) {
  * @typedef {Object} GameSave
  * @property {number} v
  * @property {boolean} started
+ * @property {boolean} openingSeen
  * @property {GameState} state
  * @property {string} mapName
  * @property {string} dir
@@ -72,6 +73,7 @@ export function createDefaultSave() {
   return {
     v: 1,
     started: false,
+    openingSeen: false,
     state: 'title',
     mapName: 'outdoor',
     dir: 'down',
@@ -99,6 +101,7 @@ export function loadSave(data = {}) {
   return {
     ...base,
     ...data,
+    openingSeen: !!(data.openingSeen ?? base.openingSeen),
     trail: { facing: data.trail?.facing || base.trail.facing, history },
     flags,
   };

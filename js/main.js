@@ -1,22 +1,25 @@
 import {
   W, H, drawMap, drawMapOverlay, drawEntities, drawTitle, drawStatus, cameraForPlayer,
   facingOffset, dirToward, snapCam,
-} from './render.js?v=20250623c';
-import { DISPLAY_H } from './sprites.js?v=20250623c';
-import { TILE, getMap, isWalkable, tileAt } from './tiles.js?v=20250623c';
+} from './render.js?v=20250623d';
+import { DISPLAY_H } from './sprites.js?v=20250623d';
+import { TILE, getMap, isWalkable, tileAt } from './tiles.js?v=20250623d';
 import {
   WORLD, npcsOnMap, getNpcLines, markTalked, findDoor, findMapExit,
   findInteractable, getInteractableLines, getFlags, setFlag,
   applyFlags, snapshotFlags, setPersistHandler, hasMetVillagers,
-} from './world.js?v=20250623c';
+} from './world.js?v=20250623d';
 import {
   readSave, writeSave, createDefaultSave, hasAllRequiredSupporters,
   isRestorableSave, clearSave,
-} from './save.js?v=20250623c';
-import { loadSprites } from './sprites.js?v=20250623c';
+} from './save.js?v=20250623d';
+import { loadSprites } from './sprites.js?v=20250623d';
 import {
   createPartyTrail, recordLeaderStep, reseedTrail, heroPos, getFacing, partyMembers,
-} from './party.js?v=20250623c';
+} from './party.js?v=20250623d';
+import {
+  loadOpeningAssets, drawOpening, getOpeningStep, getOpeningStepCount,
+} from './opening.js?v=20250623d';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -26,6 +29,7 @@ const msgText = document.getElementById('msg-text');
 const hint = document.getElementById('hint');
 const touchControls = document.getElementById('touch-controls');
 const gameFrame = document.getElementById('frame');
+const openingSkipBtn = document.getElementById('opening-skip');
 
 function detectTouchDevice() {
   if (navigator.maxTouchPoints > 0) return true;
@@ -37,10 +41,11 @@ function detectTouchDevice() {
 const isTouchDevice = detectTouchDevice();
 if (isTouchDevice) document.body.classList.add('is-touch');
 
-/** @typedef {'title'|'intro'|'play'|'dialogue'} State */
+/** @typedef {'opening'|'title'|'intro'|'play'|'dialogue'} State */
 /** @type {State} */
 let state = 'title';
 let frame = 0;
+let openingIndex = 0;
 
 let mapName = 'outdoor';
 let trail = createPartyTrail(20, 16, 'down');
@@ -67,10 +72,11 @@ function heroFromTrail() {
 }
 
 function persistGame() {
-  if (state === 'title') return;
+  if (state === 'title' || state === 'opening') return;
   writeSave({
     v: 1,
     started: state !== 'title',
+    openingSeen: true,
     state: state === 'dialogue' ? 'play' : state,
     mapName,
     dir,
@@ -100,13 +106,70 @@ function resetToFreshStart() {
   const fresh = createDefaultSave();
   applySave(fresh);
   state = 'title';
+  openingIndex = 0;
   introIndex = 0;
   dialogue = null;
   talkFacing = null;
   moveLock = false;
   moveAnim = null;
   msgEl.classList.remove('open', 'has-video');
-  writeSave(fresh);
+  writeSave({ ...fresh, openingSeen: true });
+}
+
+function updateOpeningMsg() {
+  const step = getOpeningStep(openingIndex);
+  if (!step) return;
+  if (step.titleCard) {
+    msgEl.classList.remove('open');
+    msgName.textContent = '';
+    msgText.textContent = '';
+    return;
+  }
+  msgEl.classList.add('open');
+  msgName.textContent = step.speaker || '';
+  msgText.textContent = step.text;
+}
+
+function setOpeningUi(active) {
+  document.body.classList.toggle('is-opening', active);
+  if (openingSkipBtn) openingSkipBtn.style.display = active ? '' : 'none';
+}
+
+function startOpening() {
+  state = 'opening';
+  openingIndex = 0;
+  updateOpeningMsg();
+  setOpeningUi(true);
+  refreshHint();
+}
+
+function finishOpening() {
+  const base = readSave() || createDefaultSave();
+  writeSave({
+    ...base,
+    openingSeen: true,
+    started: false,
+    state: 'title',
+  });
+  state = 'title';
+  openingIndex = 0;
+  msgEl.classList.remove('open', 'has-video');
+  setOpeningUi(false);
+  refreshHint();
+}
+
+function advanceOpening() {
+  if (openingIndex >= getOpeningStepCount() - 1) {
+    finishOpening();
+    return;
+  }
+  openingIndex += 1;
+  updateOpeningMsg();
+  refreshHint();
+}
+
+function skipOpening() {
+  finishOpening();
 }
 
 function restoreFromSave(save) {
@@ -139,13 +202,21 @@ function bootstrapFromSave() {
   const saved = readSave();
   if (saved?.started && isRestorableSave(saved)) {
     restoreFromSave(saved);
+    setOpeningUi(false);
     return;
   }
   if (saved?.started) {
     console.warn('[iyasaka-quest] invalid save — resetting to title');
     clearSave();
   }
+  const base = saved || createDefaultSave();
+  if (!base.openingSeen) {
+    applySave(base);
+    startOpening();
+    return;
+  }
   resetToFreshStart();
+  setOpeningUi(false);
 }
 
 setPersistHandler(persistGame);
@@ -164,6 +235,7 @@ function setHint(text) {
 function setUiMode() {
   document.body.classList.toggle('is-playing', state === 'play');
   document.body.classList.toggle('is-menu', isMenuState());
+  document.body.classList.toggle('is-opening', state === 'opening');
   if (touchControls) {
     touchControls.style.display = isTouchDevice && !isMenuState() ? 'grid' : '';
   }
@@ -200,6 +272,11 @@ function layoutGame() {
 function refreshHint() {
   const tap = isTouchDevice ? 'タップ' : 'クリック';
   setUiMode();
+  if (state === 'opening') {
+    canvas.style.cursor = 'pointer';
+    setHint(`${tap} / Enter / Space で つぎへ　Esc / Skip でスキップ`);
+    return;
+  }
   if (state === 'title') {
     canvas.style.cursor = 'pointer';
     setHint(`${tap} / Enter で はじめる`);
@@ -425,7 +502,7 @@ function tryMove(nx, ny, newDir) {
 }
 
 function handleInput() {
-  if (state === 'title' || state === 'intro' || state === 'dialogue') return;
+  if (state === 'opening' || state === 'title' || state === 'intro' || state === 'dialogue') return;
 
   const hero = heroPos(trail);
   if (keys.up) tryMove(hero.tx, hero.ty - 1, 'up');
@@ -435,6 +512,10 @@ function handleInput() {
 }
 
 function interact() {
+  if (state === 'opening') {
+    advanceOpening();
+    return;
+  }
   if (state === 'title') {
     state = 'intro';
     introIndex = 0;
@@ -504,6 +585,11 @@ function render() {
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, W, H);
 
+  if (state === 'opening') {
+    drawOpening(ctx, openingIndex, frame);
+    return;
+  }
+
   if (state === 'title') {
     drawTitle(ctx, WORLD.title, WORLD.subtitle, frame);
     return;
@@ -561,7 +647,7 @@ function isConfirmKey(e) {
 }
 
 function isMenuState() {
-  return state === 'title' || state === 'intro' || state === 'dialogue';
+  return state === 'opening' || state === 'title' || state === 'intro' || state === 'dialogue';
 }
 
 function onConfirm(e) {
@@ -576,6 +662,11 @@ function onConfirm(e) {
 }
 
 function onKeyDown(e) {
+  if (state === 'opening' && e.key === 'Escape') {
+    e.preventDefault();
+    skipOpening();
+    return;
+  }
   if (['ArrowUp', 'w', 'W'].includes(e.key)) {
     keys.up = true;
     e.preventDefault();
@@ -761,7 +852,16 @@ bindSwipeMove();
 bindTapAdvance();
 bindLayoutRefresh();
 
+if (openingSkipBtn) {
+  openingSkipBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (state === 'opening') skipOpening();
+  });
+}
+
 loadSprites()
+  .then(() => loadOpeningAssets())
   .then(() => {
     bootstrapFromSave();
     layoutGame();

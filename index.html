@@ -237,6 +237,25 @@
     body.is-menu #touch-controls {
       display: none !important;
     }
+    #opening-skip {
+      display: none;
+      position: absolute;
+      right: 8px;
+      bottom: 8px;
+      z-index: 6;
+      border: 2px solid #8090b8;
+      border-radius: 6px;
+      background: rgba(0, 0, 24, 0.75);
+      color: #c0d0e8;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 11px;
+      padding: 4px 10px;
+      cursor: pointer;
+    }
+    body.is-opening #opening-skip {
+      display: block;
+      z-index: 60;
+    }
     /* PC版 — 文字を大きく */
     @media (min-width: 901px) and (hover: hover) {
       h1 {
@@ -288,6 +307,7 @@
           <img id="msg-video" src="assets/items/iyasaka-video.jpg" alt="">
           <span id="msg-cursor">▼</span>
         </div>
+        <button type="button" id="opening-skip" aria-label="オープニングをスキップ">Skip</button>
       </div>
       <div id="touch-controls" aria-label="方向ボタン">
         <span class="spacer"></span>
@@ -303,6 +323,6 @@
     </div>
     <p id="hint">読み込み中…</p>
   </div>
-  <script type="module" src="js/main.js?v=20250623c"></script>
+  <script type="module" src="js/main.js?v=20250623d"></script>
 </body>
 </html>
