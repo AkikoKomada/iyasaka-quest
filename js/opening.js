@@ -1,7 +1,7 @@
 /** オープニング — 酒場シーン */
 
-import { W, H } from './render.js?v=20250623d';
-import { getSprite, DISPLAY_W, DISPLAY_H } from './sprites.js?v=20250623d';
+import { W, H } from './render.js?v=20250623h';
+import { getSprite, DISPLAY_W, DISPLAY_H } from './sprites.js?v=20250623h';
 
 /** @typedef {'black'|'tavern'} OpeningBg */
 /** @typedef {'normal'|'cheer'|null} OpeningChars */

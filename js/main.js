@@ -1,25 +1,28 @@
 import {
   W, H, drawMap, drawMapOverlay, drawEntities, drawTitle, drawStatus, cameraForPlayer,
   facingOffset, dirToward, snapCam,
-} from './render.js?v=20250623d';
-import { DISPLAY_H } from './sprites.js?v=20250623d';
-import { TILE, getMap, isWalkable, tileAt } from './tiles.js?v=20250623d';
+} from './render.js?v=20250623h';
+import { DISPLAY_H } from './sprites.js?v=20250623h';
+import { TILE, getMap, isWalkable, tileAt } from './tiles.js?v=20250623h';
 import {
   WORLD, npcsOnMap, getNpcLines, markTalked, findDoor, findMapExit,
   findInteractable, getInteractableLines, getFlags, setFlag,
   applyFlags, snapshotFlags, setPersistHandler, hasMetVillagers,
-} from './world.js?v=20250623d';
+} from './world.js?v=20250623h';
 import {
   readSave, writeSave, createDefaultSave, hasAllRequiredSupporters,
   isRestorableSave, clearSave,
-} from './save.js?v=20250623d';
-import { loadSprites } from './sprites.js?v=20250623d';
+} from './save.js?v=20250623h';
+import { loadSprites } from './sprites.js?v=20250623h';
 import {
   createPartyTrail, recordLeaderStep, reseedTrail, heroPos, getFacing, partyMembers,
-} from './party.js?v=20250623d';
+} from './party.js?v=20250623h';
 import {
   loadOpeningAssets, drawOpening, getOpeningStep, getOpeningStepCount,
-} from './opening.js?v=20250623d';
+} from './opening.js?v=20250623h';
+import {
+  unlockAudio, syncSceneAudio, playSe, onOpeningStep, isBgmEnabled, setBgmEnabled,
+} from './audio.js?v=20250623h';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -30,6 +33,7 @@ const hint = document.getElementById('hint');
 const touchControls = document.getElementById('touch-controls');
 const gameFrame = document.getElementById('frame');
 const openingSkipBtn = document.getElementById('opening-skip');
+const bgmToggleBtn = document.getElementById('bgm-toggle');
 
 function detectTouchDevice() {
   if (navigator.maxTouchPoints > 0) return true;
@@ -66,6 +70,22 @@ let talkFacing = null;
 /** @type {{ npc: import('./world.js').NpcDef, lines: string[], index: number } | null} */
 let dialogue = null;
 let introIndex = 0;
+
+function isAudioDucked() {
+  return state === 'dialogue' || state === 'intro'
+    || (state === 'opening' && msgEl.classList.contains('open'));
+}
+
+function syncGameAudio() {
+  syncSceneAudio(state, mapName, isAudioDucked());
+}
+
+function updateBgmToggleUi() {
+  if (!bgmToggleBtn) return;
+  const on = isBgmEnabled();
+  bgmToggleBtn.textContent = on ? '🎵 ON' : '🎵 OFF';
+  bgmToggleBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+}
 
 function heroFromTrail() {
   return heroPos(trail);
@@ -128,6 +148,7 @@ function updateOpeningMsg() {
   msgEl.classList.add('open');
   msgName.textContent = step.speaker || '';
   msgText.textContent = step.text;
+  syncGameAudio();
 }
 
 function setOpeningUi(active) {
@@ -141,6 +162,7 @@ function startOpening() {
   updateOpeningMsg();
   setOpeningUi(true);
   refreshHint();
+  syncGameAudio();
 }
 
 function finishOpening() {
@@ -156,6 +178,7 @@ function finishOpening() {
   msgEl.classList.remove('open', 'has-video');
   setOpeningUi(false);
   refreshHint();
+  syncGameAudio();
 }
 
 function advanceOpening() {
@@ -165,6 +188,7 @@ function advanceOpening() {
   }
   openingIndex += 1;
   updateOpeningMsg();
+  onOpeningStep(getOpeningStep(openingIndex));
   refreshHint();
 }
 
@@ -203,6 +227,7 @@ function bootstrapFromSave() {
   if (saved?.started && isRestorableSave(saved)) {
     restoreFromSave(saved);
     setOpeningUi(false);
+    syncGameAudio();
     return;
   }
   if (saved?.started) {
@@ -217,6 +242,7 @@ function bootstrapFromSave() {
   }
   resetToFreshStart();
   setOpeningUi(false);
+  syncGameAudio();
 }
 
 setPersistHandler(persistGame);
@@ -313,6 +339,7 @@ function syncMsgVideo() {
   if (isAkiko && villagersMet && dialogue.index >= 2 && !getFlags().hasVideo) {
     setFlag('hasVideo', true);
     setFlag('chapter2Unlocked', true);
+    playSe('jingle');
   }
   const show = isAkiko && villagersMet && getFlags().hasVideo && dialogue.index >= 2;
   msgEl.classList.toggle('has-video', show);
@@ -338,6 +365,7 @@ function openDialogue(npc, lines) {
   msgText.textContent = lines[0];
   syncMsgVideo();
   refreshHint();
+  syncGameAudio();
 }
 
 function openNarratorDialogue(lines) {
@@ -352,6 +380,7 @@ function closeDialogue() {
   state = 'play';
   refreshHint();
   persistGame();
+  syncGameAudio();
 }
 
 function maybeChapter2Intro() {
@@ -368,6 +397,7 @@ function advanceDialogue() {
     dialogue.index += 1;
     msgText.textContent = dialogue.lines[dialogue.index];
     syncMsgVideo();
+    syncGameAudio();
     return;
   }
   closeDialogue();
@@ -450,6 +480,7 @@ function tryMapExit() {
   cam = cameraForPlayer(currentMap(), heroPos(trail).tx, heroPos(trail).ty);
   refreshHint();
   persistGame();
+  syncGameAudio();
 }
 
 function tryTalk(preferredNpc = null) {
@@ -471,6 +502,7 @@ function tryDoor() {
     setTimeout(maybeChapter2Intro, MOVE_MS);
   }
   persistGame();
+  syncGameAudio();
 }
 
 function tryMove(nx, ny, newDir) {
@@ -524,6 +556,7 @@ function interact() {
     msgText.textContent = WORLD.intro[0];
     refreshHint();
     persistGame();
+    syncGameAudio();
     return;
   }
   if (state === 'intro') {
@@ -532,6 +565,7 @@ function interact() {
       msgText.textContent = WORLD.intro[introIndex];
       refreshHint();
       persistGame();
+      syncGameAudio();
       return;
     }
     msgEl.classList.remove('open');
@@ -540,6 +574,7 @@ function interact() {
     cam = cameraForPlayer(currentMap(), heroPos(trail).tx, heroPos(trail).ty);
     refreshHint();
     persistGame();
+    syncGameAudio();
     return;
   }
   if (state === 'dialogue') {
@@ -658,7 +693,9 @@ function onConfirm(e) {
   lastConfirmAt = now;
   e.preventDefault();
   e.stopPropagation();
+  unlockAudio();
   interact();
+  syncGameAudio();
 }
 
 function onKeyDown(e) {
@@ -754,8 +791,10 @@ function bindTapAdvance() {
     lastTapAt = now;
     e.preventDefault();
     e.stopPropagation();
+    unlockAudio();
     focusGame();
     interact();
+    syncGameAudio();
   }
 
   overlay.addEventListener('touchend', onAdvance, { passive: false });
@@ -856,7 +895,20 @@ if (openingSkipBtn) {
   openingSkipBtn.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
+    unlockAudio();
     if (state === 'opening') skipOpening();
+  });
+}
+
+if (bgmToggleBtn) {
+  updateBgmToggleUi();
+  bgmToggleBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    unlockAudio();
+    setBgmEnabled(!isBgmEnabled());
+    updateBgmToggleUi();
+    syncGameAudio();
   });
 }
 
